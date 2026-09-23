@@ -10,6 +10,9 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Librerías para exportar a PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
 
   <style>
     * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 0; }
@@ -32,32 +35,32 @@
     .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
     .bold-text { font-weight: bold; font-size: 20px; color: #1a202c; margin-top: 6px; }
     
-    /* Etiquetas y textos adaptados para facil lectura */
     .label { font-size: 14px; color: #4a5568; font-weight: 600; }
     .badge-yellow { background-color: #fefcbf; color: #744210; padding: 6px 12px; border-radius: 14px; font-size: 14px; font-weight: bold; border: 1px solid #d69e2e; }
     .badge-green { background-color: #c6f6d5; color: #1c4532; padding: 6px 12px; border-radius: 14px; font-size: 14px; font-weight: bold; border: 1px solid #38a169; }
     
     .card-grid { display: grid; grid-template-columns: 1fr; gap: 10px; font-size: 16px; color: #2d3748; margin-bottom: 14px; margin-top: 10px; }
     
-    /* Botones grandes para toques faciles */
     .btn-primary { background-color: #2c7a7b; color: white; border: none; min-height: 54px; padding: 14px; border-radius: 16px; font-size: 18px; width: 100%; cursor: pointer; font-weight: bold; margin-top: 12px; box-shadow: 0 4px 12px rgba(44,122,123,0.3); }
+    .btn-pdf-gen { background-color: #2b6cb0; color: white; border: none; min-height: 48px; padding: 12px; border-radius: 14px; font-size: 16px; width: 100%; cursor: pointer; font-weight: bold; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(43,108,176,0.3); }
     .btn-danger { background-color: #e53e3e; color: white; border: none; padding: 10px 16px; border-radius: 12px; font-size: 14px; cursor: pointer; font-weight: bold; }
     .btn-edit { background-color: #3182ce; color: white; border: none; padding: 10px 16px; border-radius: 12px; font-size: 14px; cursor: pointer; font-weight: bold; margin-right: 8px; }
+    .btn-pdf-single { background-color: #38a169; color: white; border: none; padding: 10px 16px; border-radius: 12px; font-size: 14px; cursor: pointer; font-weight: bold; margin-right: 8px; }
     .btn-back { background-color: #edf2f7; color: #2c7a7b; border: 1px solid #cbd5e0; padding: 10px 16px; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; margin-bottom: 16px; display: inline-block; }
     .fab { background-color: #2c7a7b; color: white; border: none; min-height: 56px; padding: 16px; border-radius: 18px; font-size: 19px; font-weight: bold; width: 100%; cursor: pointer; margin-top: 16px; box-shadow: 0 4px 12px rgba(44,122,123,0.3); }
     
-    /* Navegación Inferior Agrandada */
     .nav-bar { display: flex; justify-content: space-around; background-color: #ffffff; border-radius: 22px; padding: 14px; position: fixed; bottom: 14px; left: 16px; right: 16px; font-size: 15px; text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,0.15); z-index: 100; border: 1px solid #e2e8f0; }
     .nav-item-active { color: #2c7a7b; font-weight: bold; cursor: pointer; }
     .nav-item { color: #718096; cursor: pointer; }
     
-    /* Cajas de texto y selectores gigantes */
     .input-field { width: 100%; min-height: 52px; padding: 12px 16px; border-radius: 14px; border: 2px solid #cbd5e0; font-size: 17px; margin-bottom: 14px; background-color: #fff; color: #1a202c; }
     .input-field:focus { border-color: #2c7a7b; outline: none; }
+    .search-box { border-color: #2c7a7b; background-color: #f7fafc; }
     
     .login-box { background: white; padding: 28px; border-radius: 22px; margin-top: 30px; box-shadow: 0 6px 20px rgba(0,0,0,0.08); border: 1px solid #cbd5e0; }
-    .actions-row { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; border-top: 2px solid #edf2f7; padding-top: 12px; }
+    .actions-row { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 12px; border-top: 2px solid #edf2f7; padding-top: 12px; }
     .alert-banner { background-color: #ebf8ff; border: 2px solid #63b3ed; color: #2b6cb0; padding: 14px; border-radius: 16px; font-size: 15px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
+    .info-box { background-color: #e6fffa; border: 1px solid #b2f5ea; padding: 12px; border-radius: 12px; font-size: 15px; color: #234e52; margin-top: 8px; }
   </style>
 </head>
 <body>
@@ -69,24 +72,64 @@
     const SUPABASE_ANON_KEY = 'sb_publishable_3aLRXF3ttPSb5WZM6p8vcw_hn1na3U1';
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    function calcularProximoCulto(fechaFallecimiento) {
+      if (!fechaFallecimiento) return { fecha: 'N/A', detalle: 'Sin fecha' };
+
+      const [year, month, day] = fechaFallecimiento.split('-').map(Number);
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+
+      const fechaFall = new Date(year, month - 1, day);
+      fechaFall.setHours(0, 0, 0, 0);
+
+      const hitosDias = [10, 20, 30, 40, 50];
+      for (let dias of hitosDias) {
+        let fechaHito = new Date(fechaFall);
+        fechaHito.setDate(fechaHito.getDate() + dias);
+        
+        if (fechaHito >= hoy) {
+          const yyyy = fechaHito.getFullYear();
+          const mm = String(fechaHito.getMonth() + 1).padStart(2, '0');
+          const dd = String(fechaHito.getDate()).padStart(2, '0');
+          return {
+            fecha: `${yyyy}-${mm}-${dd}`,
+            detalle: `Día ${dias} de Elevación Espiritual`,
+            esHoy: fechaHito.getTime() === hoy.getTime()
+          };
+        }
+      }
+
+      let proximoAniversario = new Date(hoy.getFullYear(), month - 1, day);
+      if (proximoAniversario < hoy) {
+        proximoAniversario.setFullYear(hoy.getFullYear() + 1);
+      }
+
+      const yyyy = proximoAniversario.getFullYear();
+      const mm = String(proximoAniversario.getMonth() + 1).padStart(2, '0');
+      const dd = String(proximoAniversario.getDate()).padStart(2, '0');
+
+      return {
+        fecha: `${yyyy}-${mm}-${dd}`,
+        detalle: `Culto Anual de Aniversario (Sorei-Saishi)`,
+        esHoy: proximoAniversario.getTime() === hoy.getTime()
+      };
+    }
+
     function reproducirSonidoAlarma() {
       try {
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
-        
         osc.type = 'sine';
         osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
         gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 2.5);
-
         osc.connect(gain);
         gain.connect(audioCtx.destination);
-        
         osc.start();
         osc.stop(audioCtx.currentTime + 2.5);
       } catch (e) {
-        console.log('Error reproduciendo sonido:', e);
+        console.log('Error reproducir sonido:', e);
       }
     }
 
@@ -98,6 +141,7 @@
       const [loading, setLoading] = React.useState(false);
       const [editandoRegistro, setEditandoRegistro] = React.useState(null);
       const [notificacionesActivas, setNotificacionesActivas] = React.useState(false);
+      const [busqueda, setBusqueda] = React.useState('');
 
       const [userInput, setUserInput] = React.useState('');
       const [passInput, setPassInput] = React.useState('');
@@ -108,11 +152,7 @@
             setNotificacionesActivas(true);
           }
         }
-
-        const interval = setInterval(() => {
-          verificarAlarmasDelDia();
-        }, 30000);
-
+        const interval = setInterval(() => { verificarAlarmasDelDia(); }, 30000);
         return () => clearInterval(interval);
       }, [solicitudes]);
 
@@ -134,19 +174,20 @@
 
       function verificarAlarmasDelDia() {
         if (!solicitudes.length) return;
-
-        const hoy = new Date().toISOString().split('T')[0];
         const ahora = new Date();
         const horaStr = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
 
-        const cultosHoy = solicitudes.filter(s => s.fecha_culto === hoy);
+        const cultosHoy = solicitudes.filter(s => {
+          const info = calcularProximoCulto(s.antepasados?.fecha_fallecimiento);
+          return info.esHoy;
+        });
 
         if (cultosHoy.length > 0) {
           if (horaStr === '08:00' || horaStr === '12:00' || horaStr === '18:30') {
             reproducirSonidoAlarma();
             if (Notification.permission === "granted") {
               new Notification(`⏰ ALERTA DE CULTO (${horaStr})`, {
-                body: `Hoy se celebran ${cultosHoy.length} culto(s) de antepasados. Recuerde realizar la oración/sonnen.`,
+                body: `Hoy corresponden ${cultosHoy.length} oración(es) / culto(s) de antepasados.`,
               });
             }
           }
@@ -189,8 +230,8 @@
           .from('solicitudes_culto')
           .select(`
             id,
-            fecha_culto,
             estado_sorei_saishi,
+            fecha_registro,
             iglesia_id,
             iglesias ( nombre ),
             antepasados (
@@ -220,6 +261,117 @@
           cargarDatos();
         }
       }
+
+      // Función para exportar la lista completa a PDF
+      function exportarPDFGeneral(datosAExportar) {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        doc.setFontSize(16);
+        doc.text("Igreja Mundial do Messias - Registro de Cultos", 14, 15);
+        doc.setFontSize(11);
+        doc.text(`Reporte generado por: ${usuarioSesion.nombre}`, 14, 23);
+        doc.text(`Fecha del Reporte: ${new Date().toLocaleDateString()}`, 14, 29);
+
+        const tableColumn = ["Iglesia", "Solicitante", "Antepasado", "Condición", "F. Fallecimiento", "Próximo Culto"];
+        const tableRows = [];
+
+        datosAExportar.forEach(item => {
+          const infoCulto = calcularProximoCulto(item.antepasados?.fecha_fallecimiento);
+          const rowData = [
+            item.iglesias?.nombre || 'N/A',
+            item.antepasados?.solicitantes?.nombre_completo || 'N/A',
+            item.antepasados?.nombre_fallecido || 'N/A',
+            item.antepasados?.tipo_antepasado || 'Miembro',
+            item.antepasados?.fecha_fallecimiento || 'N/A',
+            `${infoCulto.fecha}\n(${infoCulto.detalle})`
+          ];
+          tableRows.push(rowData);
+        });
+
+        doc.autoTable({
+          head: [tableColumn],
+          body: tableRows,
+          startY: 35,
+          styles: { fontSize: 9 },
+          headStyles: { fillColor: [44, 122, 123] }
+        });
+
+        doc.save(`Registro_Cultos_${new Date().toISOString().slice(0,10)}.pdf`);
+      }
+
+      // Función para exportar ficha individual a PDF
+      function exportarPDFIndividual(item) {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        const infoCulto = calcularProximoCulto(item.antepasados?.fecha_fallecimiento);
+
+        doc.setFontSize(18);
+        doc.setTextColor(26, 54, 93);
+        doc.text("IGREJA MUNDIAL DO MESSIAS", 105, 20, null, null, "center");
+        doc.setFontSize(14);
+        doc.text("Ficha de Inscripción de Culto de Antepasados (Sorei-Saishi)", 105, 28, null, null, "center");
+        
+        doc.setLineWidth(0.5);
+        doc.line(14, 33, 196, 33);
+
+        doc.setFontSize(12);
+        doc.setTextColor(0, 0, 0);
+        
+        let y = 45;
+        doc.setFont(undefined, 'bold');
+        doc.text("DATOS DEL REGISTRO:", 14, y);
+        doc.setFont(undefined, 'normal');
+        y += 8;
+        doc.text(`Iglesia / Departamento: ${item.iglesias?.nombre || 'N/A'}`, 14, y);
+        y += 7;
+        doc.text(`Fecha de Registro en Sistema: ${item.fecha_registro ? new Date(item.fecha_registro).toLocaleString() : 'N/A'}`, 14, y);
+
+        y += 12;
+        doc.setFont(undefined, 'bold');
+        doc.text("DATOS DEL SOLICITANTE:", 14, y);
+        doc.setFont(undefined, 'normal');
+        y += 8;
+        doc.text(`Nombre Completo: ${item.antepasados?.solicitantes?.nombre_completo}`, 14, y);
+        y += 7;
+        doc.text(`Fecha de Nacimiento: ${item.antepasados?.solicitantes?.fecha_nacimiento}`, 14, y);
+        y += 7;
+        doc.text(`Condición: Miembro`, 14, y);
+
+        y += 12;
+        doc.setFont(undefined, 'bold');
+        doc.text("DATOS DEL ANTEPASADO / FALLECIDO:", 14, y);
+        doc.setFont(undefined, 'normal');
+        y += 8;
+        doc.text(`Nombre del Fallecido: ${item.antepasados?.nombre_fallecido}`, 14, y);
+        y += 7;
+        doc.text(`Fecha de Fallecimiento: ${item.antepasados?.fecha_fallecimiento}`, 14, y);
+        y += 7;
+        doc.text(`Edad al Fallecer: ${item.antepasados?.edad_fallecimiento} años`, 14, y);
+        y += 7;
+        doc.text(`Condición del Antepasado: ${item.antepasados?.tipo_antepasado || 'Miembro'}`, 14, y);
+        y += 7;
+        doc.text(`Linaje (Paterno/Esposo): ${item.antepasados?.linaje}`, 14, y);
+
+        y += 14;
+        doc.setFillColor(238, 247, 246);
+        doc.rect(14, y, 182, 22, 'F');
+        doc.setFont(undefined, 'bold');
+        doc.setTextColor(44, 122, 123);
+        doc.text(`PROGRAMACIÓN DEL PRÓXIMO CULTO / ORACIÓN:`, 18, y + 8);
+        doc.setFontSize(11);
+        doc.text(`Fecha: ${infoCulto.fecha} - (${infoCulto.detalle})`, 18, y + 16);
+
+        doc.save(`Ficha_${item.antepasados?.nombre_fallecido.replace(/\s+/g, '_')}.pdf`);
+      }
+
+      // Filtrado por Búsqueda (Nombre solicitante o antepasado)
+      const solicitudesFiltradas = solicitudes.filter(item => {
+        const texto = busqueda.toLowerCase();
+        const solNombre = item.antepasados?.solicitantes?.nombre_completo?.toLowerCase() || '';
+        const antNombre = item.antepasados?.nombre_fallecido?.toLowerCase() || '';
+        return solNombre.includes(texto) || antNombre.includes(texto);
+      });
 
       if (!usuarioSesion) {
         return (
@@ -271,33 +423,57 @@
                 {usuarioSesion.rol === 'administrador' ? 'REPORTE GENERAL (TODAS LAS IGLESIAS)' : `SOLICITUDES DE ${usuarioSesion.iglesias?.nombre.toUpperCase()}`}
               </h3>
 
-              {loading ? <p style={{ fontSize: '16px', margin: '15px 0' }}>Cargando datos...</p> : solicitudes.map((item) => (
-                <div key={item.id} class="card">
-                  <div class="card-header">
-                    <div>
-                      <span class="label">Iglesia: <strong>{item.iglesias?.nombre || 'N/A'}</strong></span>
-                      <div class="bold-text">{item.antepasados?.nombre_fallecido}</div>
-                    </div>
-                    <span class={item.estado_sorei_saishi === 'Pendiente Local' ? 'badge-yellow' : 'badge-green'}>
-                      {item.estado_sorei_saishi}
-                    </span>
-                  </div>
-                  
-                  <div class="card-grid">
-                    <div><span class="label">Condición Antepasado:</span><br/><strong>{item.antepasados?.tipo_antepasado || 'Miembro'}</strong></div>
-                    <div><span class="label">Linaje:</span><br/><strong>{item.antepasados?.linaje}</strong></div>
-                    <div><span class="label">Solicitante (Miembro):</span><br/><strong>{item.antepasados?.solicitantes?.nombre_completo}</strong></div>
-                    <div><span class="label">Fecha del Culto:</span><br/><strong style={{ color: '#2c7a7b', fontSize: '18px' }}>{item.fecha_culto}</strong></div>
-                  </div>
+              {/* Búsqueda por Nombre / Antepasado */}
+              <input 
+                class="input-field search-box" 
+                placeholder="🔍 Buscar por Solicitante o Antepasado..." 
+                value={busqueda} 
+                onChange={e => setBusqueda(e.target.value)} 
+              />
 
-                  <div class="actions-row">
-                    <button class="btn-edit" onClick={() => { setEditandoRegistro(item); setVista('nuevo'); }}>✏️ Editar</button>
-                    {usuarioSesion.rol === 'administrador' && (
-                      <button class="btn-danger" onClick={() => eliminarSolicitud(item.id)}>🗑️ Eliminar</button>
-                    )}
+              {/* Botón para exportar PDF completo */}
+              <button class="btn-pdf-gen" onClick={() => exportarPDFGeneral(solicitudesFiltradas)}>
+                📥 Descargar Reporte Completo PDF ({solicitudesFiltradas.length})
+              </button>
+
+              {loading ? <p style={{ fontSize: '16px', margin: '15px 0' }}>Cargando datos...</p> : solicitudesFiltradas.map((item) => {
+                const infoCulto = calcularProximoCulto(item.antepasados?.fecha_fallecimiento);
+                return (
+                  <div key={item.id} class="card">
+                    <div class="card-header">
+                      <div>
+                        <span class="label">Iglesia: <strong>{item.iglesias?.nombre || 'N/A'}</strong></span>
+                        <div class="bold-text">{item.antepasados?.nombre_fallecido}</div>
+                      </div>
+                      <span class={item.estado_sorei_saishi === 'Pendiente Local' ? 'badge-yellow' : 'badge-green'}>
+                        {item.estado_sorei_saishi}
+                      </span>
+                    </div>
+                    
+                    <div class="card-grid">
+                      <div><span class="label">Condición Antepasado:</span><br/><strong>{item.antepasados?.tipo_antepasado || 'Miembro'}</strong></div>
+                      <div><span class="label">Linaje:</span><br/><strong>{item.antepasados?.linaje}</strong></div>
+                      <div><span class="label">Fecha Fallecimiento:</span><br/><strong>{item.antepasados?.fecha_fallecimiento}</strong></div>
+                      <div><span class="label">Solicitante (Miembro):</span><br/><strong>{item.antepasados?.solicitantes?.nombre_completo}</strong></div>
+                      <div><span class="label">Fecha Registro en Sistema:</span><br/><strong>{item.fecha_registro ? new Date(item.fecha_registro).toLocaleDateString() : 'N/A'}</strong></div>
+                    </div>
+
+                    <div class="info-box">
+                      <strong>📅 Próxima Oración / Culto:</strong> <br/>
+                      <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#1a365d' }}>{infoCulto.fecha}</span> <br/>
+                      <span style={{ fontSize: '14px', color: '#2c7a7b', fontWeight: '600' }}>({infoCulto.detalle})</span>
+                    </div>
+
+                    <div class="actions-row">
+                      <button class="btn-pdf-single" onClick={() => exportarPDFIndividual(item)}>📄 PDF Ficha</button>
+                      <button class="btn-edit" onClick={() => { setEditandoRegistro(item); setVista('nuevo'); }}>✏️ Editar</button>
+                      {usuarioSesion.rol === 'administrador' && (
+                        <button class="btn-danger" onClick={() => eliminarSolicitud(item.id)}>🗑️ Eliminar</button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
 
               <button class="fab" onClick={() => { setEditandoRegistro(null); setVista('nuevo'); }}>
                 ➕ NUEVA SOLICITUD
@@ -338,7 +514,6 @@
       const [linaje, setLinaje] = React.useState(editando?.antepasados?.linaje || '');
       const [tipoAntepasado, setTipoAntepasado] = React.useState(editando?.antepasados?.tipo_antepasado || 'Miembro');
       
-      const [fechaCulto, setFechaCulto] = React.useState(editando?.fecha_culto || '');
       const [iglesiaId, setIglesiaId] = React.useState(editando?.iglesia_id || usuarioSesion.iglesia_id || iglesias[0]?.id);
       const [guardando, setGuardando] = React.useState(false);
 
@@ -362,7 +537,6 @@
             }).eq('id', editando.antepasados.id);
 
             await supabase.from('solicitudes_culto').update({
-              fecha_culto: fechaCulto,
               iglesia_id: iglesiaId
             }).eq('id', editando.id);
 
@@ -385,9 +559,9 @@
 
             await supabase.from('solicitudes_culto').insert([{
               antepasado_id: ant.id,
-              fecha_culto: fechaCulto,
               iglesia_id: usuarioSesion.rol === 'administrador' ? iglesiaId : usuarioSesion.iglesia_id,
-              estado_sorei_saishi: 'Pendiente Local'
+              estado_sorei_saishi: 'Pendiente Local',
+              fecha_registro: new Date().toISOString()
             }]);
 
             alert('Solicitud guardada con éxito');
@@ -448,9 +622,6 @@
             <span class="label">Linaje (A. Paterno / A. Esposo):</span>
             <input class="input-field" placeholder="Ej: Linaje Pérez / López" value={linaje} onChange={e=>setLinaje(e.target.value)} required />
           </div>
-
-          <span class="label">📅 Fecha Programada para el Culto:</span>
-          <input class="input-field" type="date" value={fechaCulto} onChange={e=>setFechaCulto(e.target.value)} required />
 
           <button class="btn-primary" type="submit" disabled={guardando}>
             {guardando ? 'Guardando...' : (editando ? 'GUARDAR CAMBIOS' : 'CREAR SOLICITUD')}
