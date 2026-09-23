@@ -35,6 +35,7 @@
     .input-field { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid #cbd5e0; font-size: 12px; margin-bottom: 8px; }
     .login-box { background: white; padding: 20px; border-radius: 15px; margin-top: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
     .actions-row { display: flex; justify-content: flex-end; gap: 5px; margin-top: 8px; border-top: 1px solid #edf2f7; padding-top: 6px; }
+    .alert-banner { background-color: #ebf8ff; border: 1px solid #90cdf4; color: #2b6cb0; padding: 8px; border-radius: 10px; font-size: 11px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
   </style>
 </head>
 <body>
@@ -42,10 +43,31 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    // Credenciales integradas
     const SUPABASE_URL = 'https://pyijfvcpdvibocatstak.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_3aLRXF3ttPSb5WZM6p8vcw_hn1na3U1';
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Sonido sintético de campana/alarma usando la API de Audio Web
+    function reproducirSonidoAlarma() {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // Tono C5 (Campana)
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 2.5);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        osc.start();
+        osc.stop(audioCtx.currentTime + 2.5);
+      } catch (e) {
+        console.log('Error reproduciendo sonido:', e);
+      }
+    }
 
     function App() {
       const [usuarioSesion, setUsuarioSesion] = React.useState(null);
@@ -54,10 +76,61 @@
       const [iglesias, setIglesias] = React.useState([]);
       const [loading, setLoading] = React.useState(false);
       const [editandoRegistro, setEditandoRegistro] = React.useState(null);
+      const [notificacionesActivas, setNotificacionesActivas] = React.useState(false);
 
-      // Campos de Login
-      const [userInput, setUserInput] = React.useState('');
-      const [passInput, setPassInput] = React.useState('');
+      // Iniciar verificador de horas para alarmas (8:00 AM, 12:00 PM, 6:30 PM)
+      React.useEffect(() => {
+        if ("Notification" in window) {
+          if (Notification.permission === "granted") {
+            setNotificacionesActivas(true);
+          }
+        }
+
+        const interval = setInterval(() => {
+          verificarAlarmasDelDia();
+        }, 30000); // Revisa cada 30 segundos
+
+        return () => clearInterval(interval);
+      }, [solicitudes]);
+
+      function activarNotificaciones() {
+        if ("Notification" in window) {
+          Notification.requestPermission().then(permission => {
+            if (permission === "granted") {
+              setNotificacionesActivas(true);
+              reproducirSonidoAlarma();
+              new Notification("🔔 Notificaciones de Cultos Activadas", {
+                body: "Recibirás alertas a las 8:00 AM, 12:00 PM y 6:30 PM en días de culto.",
+              });
+            }
+          });
+        } else {
+          alert("Este navegador no soporta notificaciones automáticas.");
+        }
+      }
+
+      function verificarAlarmasDelDia() {
+        if (!solicitudes.length) return;
+
+        const hoy = new Date().toISOString().split('T')[0];
+        const ahora = new Date();
+        const horaStr = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
+
+        // Hay cultos programados para hoy?
+        const cultosHoy = solicitudes.filter(s => s.fecha_culto === hoy);
+
+        if (cultosHoy.length > 0) {
+          // Horarios definidos: 08:00, 12:00, 18:30
+          if (horaStr === '08:00' || horaStr === '12:00' || horaStr === '18:30') {
+            reproducirSonidoAlarma();
+            if (Notification.permission === "granted") {
+              new Notification(`⏰ ALERTA DE CULTO (${horaStr})`, {
+                body: `Hoy se celebran ${cultosHoy.length} culto(s) de antepasados. Recuerde realizar la oración/sonnen.`,
+              });
+            }
+          }
+        }
+      }
 
       React.useEffect(() => {
         if (usuarioSesion) {
@@ -69,7 +142,7 @@
       async function iniciarSesion(e) {
         e.preventDefault();
         setLoading(true);
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('usuarios_sistema')
           .select('*, iglesias(nombre)')
           .eq('usuario', userInput)
@@ -83,6 +156,9 @@
         }
         setLoading(false);
       }
+
+      const [userInput, setUserInput] = React.useState('');
+      const [passInput, setPassInput] = React.useState('');
 
       async function cargarIglesias() {
         const { data } = await supabase.from('iglesias').select('*').order('nombre');
@@ -157,6 +233,13 @@
             </div>
             <button class="btn-danger" onClick={() => setUsuarioSesion(null)}>Salir</button>
           </div>
+
+          {!notificacionesActivas && (
+            <div class="alert-banner">
+              <span>🔔 Activa alarmas a las 8am, 12pm y 6:30pm</span>
+              <button class="btn-edit" onClick={activarNotificaciones}>Activar</button>
+            </div>
+          )}
 
           {vista === 'inicio' && (
             <>
@@ -318,7 +401,7 @@
             <input class="input-field" type="number" placeholder="Edad" value={edadFall} onChange={e=>setEdadFall(e.target.value)} required />
           </div>
 
-          <input class="input-field" placeholder="Linaje (A. Paterno / A. Esposo)" value={linaje} onChange={e=>setLinaje(e.target.value)} required />
+          <input class="input-field" placeholder="Linaje" value={linaje} onChange={e=>setLinaje(e.target.value)} required />
           <input class="input-field" type="date" value={fechaCulto} onChange={e=>setFechaCulto(e.target.value)} required />
 
           <button class="btn-primary" type="submit" disabled={guardando}>
